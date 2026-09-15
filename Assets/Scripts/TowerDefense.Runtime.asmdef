@@ -1,4 +1,7 @@
 {
     "name": "TowerDefense.Runtime",
-    "rootNamespace": ""
+    "rootNamespace": "",
+    "references": [
+        "Unity.InputSystem"
+    ]
 }
