@@ -10,6 +10,8 @@ public class WaveController : MonoBehaviour
     [SerializeField] private Transform destination;
     [SerializeField] private int[] enemySequence = { 0, 0, 0, 0, 0 };
     [SerializeField] private float spawnInterval = 1.2f;
+    [Tooltip("Aumento porcentual de velocidad por cada oleada ya completada. 0.15 = 15%.")]
+    [SerializeField, Min(0f)] private float speedIncreasePerWave = 0.15f;
     [SerializeField] private bool startAutomatically;
 
     private IQueueTDA pendingEnemies = new QueueTF();
@@ -67,6 +69,8 @@ public class WaveController : MonoBehaviour
         // Leer primero, crear ese tipo y quitarlo de la cola: orden FIFO.
         int enemyType = pendingEnemies.Primero();
         EnemyMovement enemy = Instantiate(enemyPrefabs[enemyType], spawnPoint.position, Quaternion.identity);
+        float speedMultiplier = 1f + CompletedWaves * speedIncreasePerWave;
+        enemy.SetSpeedMultiplier(speedMultiplier);
         enemy.SetDestination(destination);
         EnemyHealth health = enemy.GetComponent<EnemyHealth>();
         activeEnemies.Add(health);

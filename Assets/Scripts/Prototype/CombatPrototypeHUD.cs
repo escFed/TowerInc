@@ -23,6 +23,24 @@ public class CombatPrototypeHUD : MonoBehaviour
             towerStack = gameObject.AddComponent<TowerStackController>();
     }
 
+    private void OnEnable()
+    {
+        if (wave != null)
+            wave.WaveCompleted += HandleWaveCompleted;
+    }
+
+    private void OnDisable()
+    {
+        if (wave != null)
+            wave.WaveCompleted -= HandleWaveCompleted;
+    }
+
+    // La oleada solo emite este evento cuando ya no quedan enemigos activos.
+    private void HandleWaveCompleted()
+    {
+        towerStack.AddBasicTowers();
+    }
+
     private void Update()
     {
         // Solo se lee el clic cuando el jugador eligio colocar una torreta.
@@ -47,7 +65,7 @@ public class CombatPrototypeHUD : MonoBehaviour
         if (wave == null)
             return;
 
-        GUILayout.BeginArea(new Rect(16, 16, 310, 260), GUI.skin.box);
+        GUILayout.BeginArea(new Rect(16, 16, 310, 300), GUI.skin.box);
         GUILayout.Label("PROTOTIPO: TORRE + ENEMIGOS");
         GUILayout.Label("Una ruta recta / enemigo basico");
         GUILayout.Space(8);
@@ -64,6 +82,7 @@ public class CombatPrototypeHUD : MonoBehaviour
         GUILayout.Space(10);
         // El contador permite comprobar visualmente cuantos elementos quedan en la pila.
         GUILayout.Label($"Torretas basicas en pila: {towerStack.AvailableCount}");
+        GUILayout.Label("Recompensa por oleada completada: +1 torreta");
         GUI.enabled = towerStack.HasTowers;
         // Este boton activa el siguiente clic valido sobre el mapa.
         if (GUILayout.Button(placingTower ? "Hace click en el mapa..." : "Colocar torreta basica"))

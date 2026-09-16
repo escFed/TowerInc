@@ -22,6 +22,22 @@ public class TowerStackController : MonoBehaviour
     // Indica si es seguro consultar o desapilar el tope.
     public bool HasTowers => !availableTowers.PilaVacia();
 
+    // Agrega torretas al inventario como recompensa de una oleada u otra accion.
+    public void AddBasicTowers(int amount = 1)
+    {
+        if (amount <= 0)
+            return;
+
+        for (int i = 0; i < amount; i++)
+        {
+            availableTowers.Apilar(0); // 0 = torreta basica.
+            AvailableCount++;
+        }
+
+        Debug.Log($"[PILA] Recompensa: {amount} torreta(s) basica(s) agregada(s). " +
+                  $"Elementos: {AvailableCount}.", this);
+    }
+
     private void Awake()
     {
         // Se reutiliza la torreta basica que ya existe en la escena como plantilla.
@@ -37,12 +53,7 @@ public class TowerStackController : MonoBehaviour
         Debug.Log("[PILA] InicializarPila: pila vacia.", this);
 
         // Apilar tres valores 0 equivale a guardar tres torretas basicas.
-        for (int i = 0; i < initialBasicTowers; i++)
-        {
-            availableTowers.Apilar(0); // 0 = torreta basica.
-            AvailableCount++;
-            Debug.Log($"[PILA] Apilar(0): torreta basica agregada. Elementos: {AvailableCount}. Tope: {availableTowers.Tope()}.", this);
-        }
+        AddBasicTowers(initialBasicTowers);
     }
 
     // Intenta colocar la torreta que esta en el tope de la pila en una posicion del mapa.

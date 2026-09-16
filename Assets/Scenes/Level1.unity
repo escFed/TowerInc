@@ -291,6 +291,7 @@ MonoBehaviour:
   destination: {fileID: 1999971919}
   enemySequence: 0000000000000000000000000000000000000000
   spawnInterval: 1.2
+  speedIncreasePerWave: 0.7
   startAutomatically: 0
 --- !u!4 &797048238
 Transform:
@@ -408,6 +409,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1300178817}
   - component: {fileID: 1300178816}
+  - component: {fileID: 1300178818}
   m_Layer: 0
   m_Name: HUD
   m_TagString: Untagged
@@ -428,6 +430,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: TowerDefense.Runtime::CombatPrototypeHUD
   wave: {fileID: 797048237}
+  towerStack: {fileID: 0}
 --- !u!4 &1300178817
 Transform:
   m_ObjectHideFlags: 0
@@ -443,63 +446,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1001 &1447258637
-PrefabInstance:
+--- !u!114 &1300178818
+MonoBehaviour:
   m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 2263455126820804232, guid: 20715da3f6e67de4ab4717ccc1a337c5, type: 3}
-      propertyPath: m_Name
-      value: BasicTower
-      objectReference: {fileID: 0}
-    - target: {fileID: 3011801499634498458, guid: 20715da3f6e67de4ab4717ccc1a337c5, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3011801499634498458, guid: 20715da3f6e67de4ab4717ccc1a337c5, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: -1.5
-      objectReference: {fileID: 0}
-    - target: {fileID: 3011801499634498458, guid: 20715da3f6e67de4ab4717ccc1a337c5, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3011801499634498458, guid: 20715da3f6e67de4ab4717ccc1a337c5, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 3011801499634498458, guid: 20715da3f6e67de4ab4717ccc1a337c5, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3011801499634498458, guid: 20715da3f6e67de4ab4717ccc1a337c5, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3011801499634498458, guid: 20715da3f6e67de4ab4717ccc1a337c5, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3011801499634498458, guid: 20715da3f6e67de4ab4717ccc1a337c5, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3011801499634498458, guid: 20715da3f6e67de4ab4717ccc1a337c5, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3011801499634498458, guid: 20715da3f6e67de4ab4717ccc1a337c5, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 20715da3f6e67de4ab4717ccc1a337c5, type: 3}
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1300178815}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d4b4f3a6c9e45d5a2b7f8c0e1d2a3b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: TowerDefense.Runtime::TowerStackController
+  basicTowerPrefab: {fileID: 2578703591687464329, guid: 20715da3f6e67de4ab4717ccc1a337c5, type: 3}
+  initialBasicTowers: 3
+  minimumPlacementDistance: 0.9
 --- !u!1 &1999971918
 GameObject:
   m_ObjectHideFlags: 0
@@ -598,6 +559,5 @@ SceneRoots:
   - {fileID: 777471403}
   - {fileID: 988494248}
   - {fileID: 1999971919}
-  - {fileID: 1447258637}
   - {fileID: 797048238}
   - {fileID: 1300178817}
