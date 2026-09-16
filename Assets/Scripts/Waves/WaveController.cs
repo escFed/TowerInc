@@ -10,8 +10,6 @@ public class WaveController : MonoBehaviour
     [SerializeField] private Transform destination;
     [SerializeField] private int[] enemySequence = { 0, 0, 0, 0, 0 };
     [SerializeField] private float spawnInterval = 1.2f;
-    [Tooltip("Aumento porcentual de velocidad por cada oleada ya completada. 0.15 = 15%.")]
-    [SerializeField, Min(0f)] private float speedIncreasePerWave = 0.15f;
     [SerializeField] private bool startAutomatically;
 
     private IQueueTDA pendingEnemies = new QueueTF();
@@ -25,6 +23,7 @@ public class WaveController : MonoBehaviour
     public int EscapedCount { get; private set; }
     public int CompletedWaves { get; private set; }
     public event Action WaveCompleted;
+    public event Action<ExitReason> EnemyExited;
 
     private void Awake()
     {
@@ -57,6 +56,20 @@ public class WaveController : MonoBehaviour
         return true;
     }
 
+    public bool SetEnemyCount(int count, int enemyType = 0)
+    {
+        if (IsRunning || count <= 0 || enemyPrefabs == null ||
+            enemyType < 0 || enemyType >= enemyPrefabs.Length || enemyPrefabs[enemyType] == null)
+        {
+            return false;
+        }
+
+        enemySequence = new int[count];
+        for (int index = 0; index < enemySequence.Length; index++)
+            enemySequence[index] = enemyType;
+        return true;
+    }
+
     private void Update()
     {
         if (!IsRunning || pendingEnemies.ColaVacia())
@@ -69,8 +82,6 @@ public class WaveController : MonoBehaviour
         // Leer primero, crear ese tipo y quitarlo de la cola: orden FIFO.
         int enemyType = pendingEnemies.Primero();
         EnemyMovement enemy = Instantiate(enemyPrefabs[enemyType], spawnPoint.position, Quaternion.identity);
-        float speedMultiplier = 1f + CompletedWaves * speedIncreasePerWave;
-        enemy.SetSpeedMultiplier(speedMultiplier);
         enemy.SetDestination(destination);
         EnemyHealth health = enemy.GetComponent<EnemyHealth>();
         activeEnemies.Add(health);
@@ -91,6 +102,8 @@ public class WaveController : MonoBehaviour
         else if (reason == ExitReason.ReachedDestination)
             EscapedCount++;
 
+        EnemyExited?.Invoke(reason);
+
         // Cola vacia no implica oleada terminada: pueden quedar enemigos en el mapa.
         if (IsRunning && pendingEnemies.ColaVacia() && activeEnemies.Count == 0)
         {
@@ -98,6 +111,24 @@ public class WaveController : MonoBehaviour
             CompletedWaves++;
             WaveCompleted?.Invoke();
         }
+    }
+
+    public void StopWave()
+    {
+        IsRunning = false;
+        pendingEnemies.InicializarCola();
+        PendingCount = 0;
+
+        foreach (EnemyHealth enemy in activeEnemies)
+        {
+            if (enemy == null)
+                continue;
+
+            enemy.Exited -= HandleEnemyExit;
+            Destroy(enemy.gameObject);
+        }
+
+        activeEnemies.Clear();
     }
 
     private bool ValidateConfiguration()
@@ -123,13 +154,6 @@ public class WaveController : MonoBehaviour
 
     private void OnDestroy()
     {
-        foreach (EnemyHealth enemy in activeEnemies)
-        {
-            if (enemy == null)
-                continue;
-            enemy.Exited -= HandleEnemyExit;
-            Destroy(enemy.gameObject);
-        }
-        activeEnemies.Clear();
+        StopWave();
     }
 }

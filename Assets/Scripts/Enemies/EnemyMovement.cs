@@ -7,7 +7,6 @@ public class EnemyMovement : MonoBehaviour
     [SerializeField] private Transform destination;
 
     private EnemyHealth health;
-    private float speedMultiplier = 1f;
 
     private void Awake()
     {
@@ -19,12 +18,6 @@ public class EnemyMovement : MonoBehaviour
         destination = target;
     }
 
-    // La oleada configura este valor al crear cada enemigo.
-    public void SetSpeedMultiplier(float multiplier)
-    {
-        speedMultiplier = Mathf.Max(0f, multiplier);
-    }
-
     private void Update()
     {
         // Sin destino, el enemigo queda quieto para practicar el combate por separado.
@@ -33,8 +26,7 @@ public class EnemyMovement : MonoBehaviour
 
         Vector3 target = destination.position;
         target.z = transform.position.z;
-        float currentSpeed = Mathf.Max(0f, speed) * speedMultiplier;
-        transform.position = Vector3.MoveTowards(transform.position, target, currentSpeed * Time.deltaTime);
+        transform.position = Vector3.MoveTowards(transform.position, target, Mathf.Max(0, speed) * Time.deltaTime);
 
         if ((transform.position - target).sqrMagnitude <= 0.0025f)
             health.ReachDestination();

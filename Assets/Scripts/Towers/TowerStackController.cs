@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -17,10 +18,21 @@ public class TowerStackController : MonoBehaviour
     // Posiciones ya ocupadas por torretas de la escena o colocadas por el jugador.
     private readonly List<Vector2> occupiedPositions = new List<Vector2>();
 
+    // La colocacion actual usa la misma pila enlazada para recordar el tipo de
+    // cada torre. Las referencias se mantienen en paralelo porque StackTF solo
+    // admite enteros y su contrato no se modifica.
+    private readonly IStackTDA placementHistory = new StackTF();
+    private readonly List<TowerController> placedTowers = new List<TowerController>();
+    private int[] placedTowerCounts = new int[0];
+
     // Cantidad actual de elementos almacenados en la pila.
     public int AvailableCount { get; private set; }
     // Indica si es seguro consultar o desapilar el tope.
     public bool HasTowers => !availableTowers.PilaVacia();
+    public int PlacedTowerCount => placedTowers.Count;
+    public bool CanUndo => !placementHistory.PilaVacia() && placedTowers.Count > 0;
+
+    public event Action<int> TowerCountChanged;
 
     // Agrega torretas al inventario como recompensa de una oleada u otra accion.
     public void AddBasicTowers(int amount = 1)
@@ -50,6 +62,7 @@ public class TowerStackController : MonoBehaviour
 
         // La pila comienza vacia antes de cargar las torretas iniciales.
         availableTowers.InicializarPila();
+        placementHistory.InicializarPila();
         Debug.Log("[PILA] InicializarPila: pila vacia.", this);
 
         // Apilar tres valores 0 equivale a guardar tres torretas basicas.
@@ -80,6 +93,67 @@ public class TowerStackController : MonoBehaviour
         occupiedPositions.Add(position);
         Debug.Log($"[PILA] Desapilar(): torreta basica retirada. Elementos restantes: {AvailableCount}." +
                   (HasTowers ? $" Nuevo tope: {availableTowers.Tope()}." : " La pila quedo vacia."), this);
+        return true;
+    }
+
+    // Adapta el controlador anterior al sistema de colocacion actual sin
+    // cambiar la implementacion ni el comportamiento LIFO de StackTF.
+    public void ConfigureTowerTypes(int towerTypeCount)
+    {
+        int safeCount = Mathf.Max(0, towerTypeCount);
+        if (placedTowerCounts.Length == safeCount)
+            return;
+
+        int[] resizedCounts = new int[safeCount];
+        int copiedCount = Mathf.Min(placedTowerCounts.Length, resizedCounts.Length);
+        for (int index = 0; index < copiedCount; index++)
+            resizedCounts[index] = placedTowerCounts[index];
+
+        placedTowerCounts = resizedCounts;
+    }
+
+    public int GetPlacedTowerCount(int towerType)
+    {
+        if (towerType < 0 || towerType >= placedTowerCounts.Length)
+            return 0;
+
+        return placedTowerCounts[towerType];
+    }
+
+    public bool RegisterPlacement(TowerController tower, int towerType)
+    {
+        if (tower == null || towerType < 0 || towerType >= placedTowerCounts.Length)
+            return false;
+
+        placementHistory.Apilar(towerType);
+        placedTowers.Add(tower);
+        placedTowerCounts[towerType]++;
+        occupiedPositions.Add(tower.transform.position);
+        TowerCountChanged?.Invoke(PlacedTowerCount);
+        return true;
+    }
+
+    public bool TryPopLastPlacement(out TowerController tower, out int towerType)
+    {
+        tower = null;
+        towerType = -1;
+        if (!CanUndo)
+            return false;
+
+        towerType = placementHistory.Tope();
+        placementHistory.Desapilar();
+
+        int lastIndex = placedTowers.Count - 1;
+        tower = placedTowers[lastIndex];
+        placedTowers.RemoveAt(lastIndex);
+
+        if (towerType >= 0 && towerType < placedTowerCounts.Length)
+            placedTowerCounts[towerType] = Mathf.Max(0, placedTowerCounts[towerType] - 1);
+
+        if (tower != null)
+            occupiedPositions.Remove(tower.transform.position);
+
+        TowerCountChanged?.Invoke(PlacedTowerCount);
         return true;
     }
 
