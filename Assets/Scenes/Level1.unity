@@ -155,7 +155,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -350}
+  m_AnchoredPosition: {x: 0, y: -185}
   m_SizeDelta: {x: 500, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &73918025
@@ -1592,6 +1592,7 @@ MonoBehaviour:
   - {fileID: 7960398711502438076, guid: f4baa7a6dc3a4f646bf06f3065ea1cd3, type: 3}
   spawnPoint: {fileID: 988494248}
   destination: {fileID: 1999971919}
+  pathGraph: {fileID: 0}
   enemySequence: 0000000000000000000000000000000000000000
   spawnInterval: 0.5
   startAutomatically: 0
@@ -2153,8 +2154,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 600, y: -400}
-  m_SizeDelta: {x: 100, y: 200}
+  m_AnchoredPosition: {x: 512.74915, y: -400}
+  m_SizeDelta: {x: 105.4983, y: 200}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1098379441
 MonoBehaviour:
@@ -2848,6 +2849,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ee28b329195333f43a67a83ed3864b34, type: 3}
   m_Name: 
   m_EditorClassIdentifier: TowerDefense.Runtime::TowerStackController
+  basicTowerPrefab: {fileID: 0}
+  initialBasicTowers: 3
+  minimumPlacementDistance: 0.9
 --- !u!1 &1284064705
 GameObject:
   m_ObjectHideFlags: 0
@@ -3849,8 +3853,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -350, y: 450}
-  m_SizeDelta: {x: 1000, y: 100}
+  m_AnchoredPosition: {x: 0, y: 200}
+  m_SizeDelta: {x: 947.4441, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2011680934
 MonoBehaviour:
@@ -3899,8 +3903,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 50
-  m_fontSizeBase: 50
+  m_fontSize: 27.6
+  m_fontSizeBase: 27.6
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -3938,7 +3942,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: 0, y: 0, z: 3.0913086, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0

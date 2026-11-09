@@ -8,6 +8,7 @@ public class WaveController : MonoBehaviour
     [SerializeField] private EnemyMovement[] enemyPrefabs;
     [SerializeField] private Transform spawnPoint;
     [SerializeField] private Transform destination;
+    [SerializeField] private PathGraphController pathGraph;
     [SerializeField] private int[] enemySequence = { 0, 0, 0, 0, 0 };
     [SerializeField] private float spawnInterval = 1.2f;
     [SerializeField] private bool startAutomatically;
@@ -15,6 +16,7 @@ public class WaveController : MonoBehaviour
     private IQueueTDA pendingEnemies = new QueueTF();
     private HashSet<EnemyHealth> activeEnemies = new HashSet<EnemyHealth>();
     private float spawnTimer;
+    private List<Vector3> waveRoute = new List<Vector3>();
 
     public bool IsRunning { get; private set; }
     public int PendingCount { get; private set; }
@@ -28,6 +30,13 @@ public class WaveController : MonoBehaviour
     private void Awake()
     {
         pendingEnemies.InicializarCola();
+
+        if (pathGraph == null)
+            pathGraph = FindFirstObjectByType<PathGraphController>();
+        if (pathGraph == null)
+            pathGraph = gameObject.AddComponent<PathGraphController>();
+
+        pathGraph.ConfigureEndpoints(spawnPoint, destination);
     }
 
     private void Start()
@@ -43,6 +52,12 @@ public class WaveController : MonoBehaviour
 
         if (!ValidateConfiguration())
             return false;
+
+        if (pathGraph == null || !pathGraph.TryGetShortestRoute(out waveRoute))
+        {
+            Debug.LogError("No se pudo calcular una ruta con el Grafo y Dijkstra.", this);
+            return false;
+        }
 
         pendingEnemies.InicializarCola();
         foreach (int enemyType in enemySequence)
@@ -82,7 +97,7 @@ public class WaveController : MonoBehaviour
         // Leer primero, crear ese tipo y quitarlo de la cola: orden FIFO.
         int enemyType = pendingEnemies.Primero();
         EnemyMovement enemy = Instantiate(enemyPrefabs[enemyType], spawnPoint.position, Quaternion.identity);
-        enemy.SetDestination(destination);
+        enemy.SetRoute(waveRoute);
         EnemyHealth health = enemy.GetComponent<EnemyHealth>();
         activeEnemies.Add(health);
         health.Exited += HandleEnemyExit;
