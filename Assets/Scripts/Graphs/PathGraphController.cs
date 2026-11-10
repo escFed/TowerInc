@@ -6,15 +6,12 @@ using UnityEngine;
 public sealed class PathGraphController : MonoBehaviour
 {
     [Header("Nodos intermedios del camino")]
-    [SerializeField] private Vector3 upperLeftNode = new Vector3(-4f, 2f, 0f);
-    [SerializeField] private Vector3 upperRightNode = new Vector3(0f, 2f, 0f);
-    [SerializeField] private Vector3 lowerLeftNode = new Vector3(-3f, -2f, 0f);
-    [SerializeField] private Vector3 lowerRightNode = new Vector3(2f, -2f, 0f);
-
-    [Header("Decision de ruta")]
-    [Tooltip("Una torreta dentro de este radio vuelve mas peligroso el tramo cercano.")]
-    [SerializeField, Min(0.1f)] private float towerAvoidanceRadius = 2.1f;
-    [SerializeField, Min(1)] private int costPerNearbyTower = 4;
+    [SerializeField] private Vector3 upperLeftNode = new Vector3(-4f, 2.5f, 0f);
+    [SerializeField] private Vector3 upperRightNode = new Vector3(0f, 2.5f, 0f);
+    [SerializeField] private Vector3 middleNode = new Vector3(0f, 0f, 0f);
+    [SerializeField] private Vector3 lowerLeftNode = new Vector3(-4f, -2.5f, 0f);
+    [SerializeField] private Vector3 lowerRightNode = new Vector3(0f, -2.5f, 0f);
+    [SerializeField] private Vector3 mergeNode = new Vector3(3f, 0f, 0f);
 
     [Header("Camino visible en el nivel")]
     [SerializeField, Min(0.1f)] private float roadWidth = 0.65f;
@@ -41,7 +38,7 @@ public sealed class PathGraphController : MonoBehaviour
     {
         BuildGraph();
         route = new List<Vector3>();
-        if (!AlgDijkstra.TryGetShortestPath(graph, 1, 6, out List<int> nodePath, out int cost))
+        if (!AlgDijkstra.TryGetShortestPath(graph, 1, 8, out List<int> nodePath, out int cost))
             return false;
 
         RefreshRoadVisuals(nodePath);
@@ -68,41 +65,33 @@ public sealed class PathGraphController : MonoBehaviour
         nodePositions[1] = spawn != null ? spawn.position : new Vector3(-7f, 0f, 0f);
         nodePositions[2] = upperLeftNode;
         nodePositions[3] = upperRightNode;
-        nodePositions[4] = lowerLeftNode;
-        nodePositions[5] = lowerRightNode;
-        nodePositions[6] = goal != null ? goal.position : new Vector3(7f, 0f, 0f);
+        nodePositions[4] = middleNode;
+        nodePositions[5] = lowerLeftNode;
+        nodePositions[6] = lowerRightNode;
+        nodePositions[7] = mergeNode;
+        nodePositions[8] = goal != null ? goal.position : new Vector3(7f, 0f, 0f);
 
         graph = new GrafoMA();
         graph.InicializarGrafo();
-        for (int node = 1; node <= 6; node++)
+        for (int node = 1; node <= 8; node++)
             graph.AgregarVertice(node);
 
-        // Camino superior. El costo cambia segun las torretas cercanas.
-        graph.AgregarArista(1, 2, GetEdgeCost(1, 2, 2));
-        graph.AgregarArista(2, 3, GetEdgeCost(2, 3, 2));
-        graph.AgregarArista(3, 6, GetEdgeCost(3, 6, 2));
+        // Ruta superior: 1 -> 2 -> 3 -> 7 -> 8. Costo total 16.
+        graph.AgregarArista(1, 2, 4);
+        graph.AgregarArista(2, 3, 4);
+        graph.AgregarArista(3, 7, 4);
 
-        // Camino inferior alternativo, inicialmente mas largo.
-        graph.AgregarArista(1, 4, GetEdgeCost(1, 4, 2));
-        graph.AgregarArista(4, 5, GetEdgeCost(4, 5, 5));
-        graph.AgregarArista(5, 6, GetEdgeCost(5, 6, 2));
-    }
+        // Ruta central: 1 -> 4 -> 7 -> 8. Es la mas corta: costo total 14.
+        graph.AgregarArista(1, 4, 7);
+        graph.AgregarArista(4, 7, 3);
 
-    // Esta es la funcion jugable de Dijkstra: una ruta con torretas cerca
-    // aumenta su costo y los enemigos pueden elegir la otra rama del mapa.
-    private int GetEdgeCost(int from, int to, int baseCost)
-    {
-        Vector3 middle = (nodePositions[from] + nodePositions[to]) * 0.5f;
-        int nearbyTowers = 0;
-        float radiusSquared = towerAvoidanceRadius * towerAvoidanceRadius;
+        // Ruta inferior: 1 -> 5 -> 6 -> 7 -> 8. Costo total 16.
+        graph.AgregarArista(1, 5, 4);
+        graph.AgregarArista(5, 6, 4);
+        graph.AgregarArista(6, 7, 4);
 
-        foreach (TowerController tower in FindObjectsByType<TowerController>(FindObjectsSortMode.None))
-        {
-            if (tower != null && (tower.transform.position - middle).sqrMagnitude <= radiusSquared)
-                nearbyTowers++;
-        }
-
-        return baseCost + nearbyTowers * costPerNearbyTower;
+        // El ultimo tramo es comun: desde la union hasta la Base.
+        graph.AgregarArista(7, 8, 4);
     }
 
     private void RefreshRoadVisuals(List<int> selectedPath)
@@ -120,10 +109,13 @@ public sealed class PathGraphController : MonoBehaviour
         EnsureRoadMaterial();
         ConfigureRoadSegment(0, 1, 2, IsSelectedEdge(selectedPath, 1, 2));
         ConfigureRoadSegment(1, 2, 3, IsSelectedEdge(selectedPath, 2, 3));
-        ConfigureRoadSegment(2, 3, 6, IsSelectedEdge(selectedPath, 3, 6));
+        ConfigureRoadSegment(2, 3, 7, IsSelectedEdge(selectedPath, 3, 7));
         ConfigureRoadSegment(3, 1, 4, IsSelectedEdge(selectedPath, 1, 4));
-        ConfigureRoadSegment(4, 4, 5, IsSelectedEdge(selectedPath, 4, 5));
-        ConfigureRoadSegment(5, 5, 6, IsSelectedEdge(selectedPath, 5, 6));
+        ConfigureRoadSegment(4, 4, 7, IsSelectedEdge(selectedPath, 4, 7));
+        ConfigureRoadSegment(5, 1, 5, IsSelectedEdge(selectedPath, 1, 5));
+        ConfigureRoadSegment(6, 5, 6, IsSelectedEdge(selectedPath, 5, 6));
+        ConfigureRoadSegment(7, 6, 7, IsSelectedEdge(selectedPath, 6, 7));
+        ConfigureRoadSegment(8, 7, 8, IsSelectedEdge(selectedPath, 7, 8));
     }
 
     private void ConfigureRoadSegment(int index, int from, int to, bool selected)
@@ -180,14 +172,17 @@ public sealed class PathGraphController : MonoBehaviour
         BuildGraph();
         DrawEdge(1, 2, Color.gray);
         DrawEdge(2, 3, Color.gray);
-        DrawEdge(3, 6, Color.yellow);
+        DrawEdge(3, 7, Color.gray);
         DrawEdge(1, 4, Color.gray);
-        DrawEdge(4, 5, Color.gray);
+        DrawEdge(4, 7, Color.yellow);
+        DrawEdge(1, 5, Color.gray);
         DrawEdge(5, 6, Color.gray);
+        DrawEdge(6, 7, Color.gray);
+        DrawEdge(7, 8, Color.yellow);
 
         foreach (KeyValuePair<int, Vector3> node in nodePositions)
         {
-            Gizmos.color = node.Key == 1 ? Color.green : node.Key == 6 ? Color.red : Color.white;
+            Gizmos.color = node.Key == 1 ? Color.green : node.Key == 8 ? Color.red : Color.white;
             Gizmos.DrawSphere(node.Value, 0.12f);
         }
     }
