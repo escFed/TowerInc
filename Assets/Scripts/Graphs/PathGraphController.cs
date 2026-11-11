@@ -6,17 +6,20 @@ using UnityEngine;
 using UnityEditor;
 #endif
 
-// Grafo editable para las rutas de enemigos. Agrega elementos a Nodes y Edges desde el Inspector.
+// Convierte los waypoints de la escena en un grafo y devuelve la ruta mas barata hasta la Base.
 public sealed class PathGraphController : MonoBehaviour
 {
+    // El 17 es un vertice logico: su posicion se toma del Transform de la Base.
     private const int BaseNode = 17;
-    private const int DefaultSpawnNode = 5;
+    private const int DefaultSpawnNode = 1;
     private const int CurrentLayoutVersion = 2;
 
     [Serializable]
     private struct GraphNode
     {
+        // ID usado por el grafo y por WaveController para elegir el punto de salida.
         public int id;
+        // Posicion de respaldo si la escena no tiene un GameObject llamado Nodo{id}.
         public Vector2 position;
 
         public GraphNode(int nodeId, float x, float y)
@@ -29,6 +32,7 @@ public sealed class PathGraphController : MonoBehaviour
     [Serializable]
     private struct GraphEdge
     {
+        // IDs de los dos extremos de una conexion. El costo se calcula con sus posiciones.
         public int from;
         public int to;
 
@@ -44,6 +48,7 @@ public sealed class PathGraphController : MonoBehaviour
     [SerializeField] private GraphNode[] nodes;
     [Tooltip("Cada elemento conecta dos nodos en ambos sentidos. Agrega conexiones para crear desvíos.")]
     [SerializeField] private GraphEdge[] edges;
+    // Permite reemplazar una sola vez una configuracion vieja sin pisar cambios posteriores.
     [SerializeField, HideInInspector] private int layoutVersion;
 
     private readonly Dictionary<int, Vector3> nodePositions = new Dictionary<int, Vector3>();
@@ -54,6 +59,7 @@ public sealed class PathGraphController : MonoBehaviour
 
     public void ConfigureEndpoints(Transform spawnPoint, Transform destination)
     {
+        // WaveController pasa estos objetos de la escena para alinear el grafo con Spawn y Base.
         spawn = spawnPoint;
         goal = destination;
         BuildGraph();
@@ -63,11 +69,13 @@ public sealed class PathGraphController : MonoBehaviour
 
     public bool TryGetShortestRoute(int originNode, out List<Vector3> route)
     {
+        // Se reconstruye antes de cada busqueda para usar las posiciones actuales de los waypoints.
         BuildGraph();
         route = new List<Vector3>();
         if (!AlgDijkstra.TryGetShortestPath(graph, originNode, BaseNode, out List<int> nodePath, out int cost))
             return false;
 
+        // Dijkstra devuelve IDs; el enemigo necesita posiciones para poder moverse en la escena.
         latestPath = nodePath;
         StringBuilder description = new StringBuilder("[GRAFO + DIJKSTRA] Ruta minima: ");
         foreach (int node in nodePath)
@@ -112,6 +120,7 @@ public sealed class PathGraphController : MonoBehaviour
             new GraphNode(17, 8f, 1f)
         };
 
+        // Estas conexiones forman los caminos posibles. Para sumar un desvio, agrega un GraphEdge.
         edges = new[]
         {
             new GraphEdge(1,2), new GraphEdge(1,5), new GraphEdge(2,11), new GraphEdge(2,15),
@@ -124,6 +133,7 @@ public sealed class PathGraphController : MonoBehaviour
         layoutVersion = CurrentLayoutVersion;
     }
 
+    // Primero registra todos los vertices; despues crea las aristas cuyos extremos existen.
     private void BuildGraph()
     {
         if (nodes == null || nodes.Length == 0)
@@ -134,6 +144,7 @@ public sealed class PathGraphController : MonoBehaviour
         graph.InicializarGrafo();
         foreach (GraphNode node in nodes)
         {
+            // Se ignoran IDs fuera del rango y duplicados para no crear vertices ambiguos.
             if (node.id < 1 || node.id > 32 || nodePositions.ContainsKey(node.id))
                 continue;
             Vector3 position = GetWaypointPosition(node);
@@ -145,14 +156,17 @@ public sealed class PathGraphController : MonoBehaviour
             return;
         foreach (GraphEdge edge in edges)
         {
+            // Una conexion incompleta se omite; ambos nodos deben haberse registrado primero.
             if (!nodePositions.ContainsKey(edge.from) || !nodePositions.ContainsKey(edge.to) || edge.from == edge.to)
                 continue;
             AddBidirectionalEdge(edge.from, edge.to);
         }
     }
 
+    // La escena manda sobre la posicion de NodoN; el valor guardado sirve de respaldo.
     private Vector3 GetWaypointPosition(GraphNode node)
     {
+        // La Base se toma del objeto configurado, aunque su ID logico sea 17.
         if (node.id == BaseNode && goal != null)
             return goal.position;
 
@@ -164,6 +178,7 @@ public sealed class PathGraphController : MonoBehaviour
             : new Vector3(node.position.x, node.position.y, 0f);
     }
 
+    // Una entrada de Edges habilita el paso en ambos sentidos y usa distancia como peso.
     private void AddBidirectionalEdge(int first, int second)
     {
         int cost = GetDistanceCost(first, second);
@@ -172,10 +187,12 @@ public sealed class PathGraphController : MonoBehaviour
     }
 
     private int GetDistanceCost(int from, int to) =>
+        // Dijkstra trabaja con enteros: se redondea la distancia y se evita un costo cero.
         Mathf.Max(1, Mathf.RoundToInt(Vector3.Distance(nodePositions[from], nodePositions[to])));
 
     private bool IsSelectedEdge(int from, int to)
     {
+        // Compara cada conexion con los pares consecutivos de la ultima ruta calculada.
         for (int index = 0; index < latestPath.Count - 1; index++)
         {
             int first = latestPath[index];
@@ -188,6 +205,7 @@ public sealed class PathGraphController : MonoBehaviour
 
     private void OnDrawGizmos()
     {
+        // Dibujo de ayuda del Editor: gris para conexiones disponibles, amarillo para la ultima ruta.
         BuildGraph();
         if (edges != null)
         {
