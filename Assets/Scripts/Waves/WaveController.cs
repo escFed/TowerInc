@@ -9,8 +9,8 @@ public class WaveController : MonoBehaviour
     [SerializeField] private Transform spawnPoint;
     [SerializeField] private Transform destination;
     [SerializeField] private PathGraphController pathGraph;
-    [Tooltip("Nodo de origen por oleada. Ejemplo: 1, 15, 16.")]
-    [SerializeField] private int[] sourceNodesPerWave = { 1, 15, 16 };
+    [Tooltip("En Level1, las oleadas salen del objeto Spawn (nodo 1), no de waypoints internos.")]
+    [SerializeField] private int[] sourceNodesPerWave = { 1, 1, 1 };
     [SerializeField] private int[] enemySequence = { 0, 0, 0, 0, 0 };
     [SerializeField] private float spawnInterval = 1.2f;
     [SerializeField] private bool startAutomatically;
