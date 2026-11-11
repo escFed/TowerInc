@@ -144,3 +144,5 @@ MonoBehaviour:
   enemyLayers:
     serializedVersion: 2
     m_Bits: 4294967295
+  levelTwoSprite: {fileID: -3493778802226009120, guid: 95e3ff620e4b6aa42a9858ecc54c0c11, type: 3}
+  levelThreeSprite: {fileID: -6435572131757580343, guid: b495e36397ed3cf47b20100b63362fc7, type: 3}

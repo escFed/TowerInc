@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class WaveController : MonoBehaviour
 {
@@ -9,8 +10,9 @@ public class WaveController : MonoBehaviour
     [SerializeField] private Transform spawnPoint;
     [SerializeField] private Transform destination;
     [SerializeField] private PathGraphController pathGraph;
-    [Tooltip("Nodo de origen por oleada. Ejemplo: 1, 15, 16.")]
-    [SerializeField] private int[] sourceNodesPerWave = { 1, 15, 16 };
+    [Tooltip("Los enemigos de cada oleada alternan entre estos nodos de origen, en orden.")]
+    [FormerlySerializedAs("sourceNodesPerWave")]
+    [SerializeField] private int[] sourceNodeIds = { 1, 15, 16 };
     [SerializeField] private int[] enemySequence = { 0, 0, 0, 0, 0 };
     [SerializeField] private float spawnInterval = 1.2f;
     [SerializeField] private bool startAutomatically;
@@ -18,8 +20,9 @@ public class WaveController : MonoBehaviour
     private IQueueTDA pendingEnemies = new QueueTF();
     private HashSet<EnemyHealth> activeEnemies = new HashSet<EnemyHealth>();
     private float spawnTimer;
-    private List<Vector3> waveRoute = new List<Vector3>();
-    private Vector3 waveSpawnPosition;
+    private readonly Dictionary<int, List<Vector3>> waveRoutes = new Dictionary<int, List<Vector3>>();
+    private int[] waveSourceNodes;
+    private int spawnedCount;
 
     public bool IsRunning { get; private set; }
     public int PendingCount { get; private set; }
@@ -56,16 +59,33 @@ public class WaveController : MonoBehaviour
         if (!ValidateConfiguration())
             return false;
 
-        // La oleada no siempre sale del mismo lugar: se toma el nodo de origen configurado.
-        int sourceNode = GetSourceNodeForCurrentWave();
-        if (pathGraph == null || !pathGraph.TryGetShortestRoute(sourceNode, out waveRoute) || waveRoute.Count == 0)
+        if (sourceNodeIds == null || sourceNodeIds.Length == 0)
         {
-            Debug.LogError("No se pudo calcular una ruta con el Grafo y Dijkstra.", this);
+            Debug.LogError("WaveController necesita al menos un nodo de origen.", this);
             return false;
         }
 
-        // El primer punto de la ruta es el Spawn elegido; los demas son nodos intermedios y Base.
-        waveSpawnPosition = waveRoute[0];
+        // Calcula una ruta por origen antes de iniciar la oleada; cada enemigo reutiliza la suya.
+        Dictionary<int, List<Vector3>> routes = new Dictionary<int, List<Vector3>>();
+        foreach (int sourceNode in sourceNodeIds)
+        {
+            if (routes.ContainsKey(sourceNode))
+                continue;
+
+            if (pathGraph == null || !pathGraph.TryGetShortestRoute(sourceNode, out List<Vector3> route) || route.Count == 0)
+            {
+                Debug.LogError($"No se pudo calcular una ruta desde el nodo {sourceNode} con el Grafo y Dijkstra.", this);
+                return false;
+            }
+
+            routes.Add(sourceNode, route);
+        }
+
+        waveRoutes.Clear();
+        foreach (KeyValuePair<int, List<Vector3>> entry in routes)
+            waveRoutes.Add(entry.Key, entry.Value);
+        waveSourceNodes = (int[])sourceNodeIds.Clone();
+        spawnedCount = 0;
 
         pendingEnemies.InicializarCola();
         foreach (int enemyType in enemySequence)
@@ -105,8 +125,11 @@ public class WaveController : MonoBehaviour
         // Leer primero, crear ese tipo y quitarlo de la cola: orden FIFO.
         int enemyType = pendingEnemies.Primero();
         // La cola decide que enemigo sale; el grafo decide desde donde sale y por donde avanza.
-        EnemyMovement enemy = Instantiate(enemyPrefabs[enemyType], waveSpawnPosition, Quaternion.identity);
-        enemy.SetRoute(waveRoute);
+        int sourceNode = waveSourceNodes[spawnedCount % waveSourceNodes.Length];
+        List<Vector3> route = waveRoutes[sourceNode];
+        EnemyMovement enemy = Instantiate(enemyPrefabs[enemyType], route[0], Quaternion.identity);
+        enemy.SetRoute(route);
+        spawnedCount++;
         EnemyHealth health = enemy.GetComponent<EnemyHealth>();
         activeEnemies.Add(health);
         health.Exited += HandleEnemyExit;
@@ -179,16 +202,5 @@ public class WaveController : MonoBehaviour
     private void OnDestroy()
     {
         StopWave();
-    }
-
-    // Se configura desde el Inspector. Si hay mas oleadas que nodos de origen,
-    // se reutiliza el ultimo origen configurado.
-    private int GetSourceNodeForCurrentWave()
-    {
-        if (sourceNodesPerWave == null || sourceNodesPerWave.Length == 0)
-            return 1;
-
-        int waveIndex = Mathf.Clamp(CompletedWaves, 0, sourceNodesPerWave.Length - 1);
-        return Mathf.Max(1, sourceNodesPerWave[waveIndex]);
     }
 }

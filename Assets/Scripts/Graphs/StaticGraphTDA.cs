@@ -5,6 +5,7 @@ using System.Collections.Generic;
 // Se mantiene separado de la cola y la pila: cada estructura resuelve su propia tarea.
 public interface IConjuntoTDA
 {
+    // Operaciones basicas para un conjunto: cada valor aparece como maximo una vez.
     void InicializarConjunto();
     bool ConjuntoVacio();
     void Agregar(int value);
@@ -15,12 +16,14 @@ public interface IConjuntoTDA
 
 internal sealed class NodoConjunto
 {
+    // Cada nodo guarda un entero y el enlace al siguiente elemento de la lista.
     public int Value;
     public NodoConjunto Next;
 }
 
 public sealed class ConjuntoLD : IConjuntoTDA
 {
+    // La lista comienza en first; agregar y buscar recorren enlaces, no un arreglo.
     private NodoConjunto first;
 
     public void InicializarConjunto() => first = null;
@@ -28,6 +31,7 @@ public sealed class ConjuntoLD : IConjuntoTDA
 
     public void Agregar(int value)
     {
+        // Evita duplicados antes de insertar el nuevo elemento al comienzo de la lista.
         if (Pertenece(value))
             return;
 
@@ -55,6 +59,7 @@ public sealed class ConjuntoLD : IConjuntoTDA
 
     public void Sacar(int value)
     {
+        // Se conservan ambos enlaces para poder quitar el primero o uno intermedio.
         NodoConjunto previous = null;
         NodoConjunto current = first;
 
@@ -77,6 +82,7 @@ public sealed class ConjuntoLD : IConjuntoTDA
 // Grafo estatico representado con matriz de adyacencia, como el TDA visto en clase.
 public interface IGrafoTDA
 {
+    // Contrato del grafo: inicializar, registrar vertices/aristas y consultar conexiones.
     void InicializarGrafo();
     void AgregarVertice(int vertex);
     void AgregarArista(int origin, int destination, int cost);
@@ -90,6 +96,7 @@ public sealed class GrafoMA : IGrafoTDA
     // Se usa un valor grande como "infinito": significa que dos nodos no tienen conexion directa.
     public const int Infinity = int.MaxValue / 4;
 
+    // La posicion de un vertice en labels determina su fila/columna en adjacency.
     private readonly int[,] adjacency = new int[32, 32];
     private readonly int[] labels = new int[32];
     private int vertexCount;
@@ -99,6 +106,7 @@ public sealed class GrafoMA : IGrafoTDA
     public void InicializarGrafo()
     {
         vertexCount = 0;
+        // Al principio no hay conexiones entre ningun par de vertices.
         for (int row = 0; row < adjacency.GetLength(0); row++)
         {
             for (int column = 0; column < adjacency.GetLength(1); column++)
@@ -108,6 +116,7 @@ public sealed class GrafoMA : IGrafoTDA
 
     public void AgregarVertice(int vertex)
     {
+        // No duplica IDs: Dijkstra usa estas etiquetas para traducir entre nodo e indice.
         if (FindIndex(vertex) >= 0)
             return;
         if (vertexCount >= labels.Length)
@@ -125,7 +134,7 @@ public sealed class GrafoMA : IGrafoTDA
         if (cost < 0)
             throw new ArgumentOutOfRangeException(nameof(cost), "Dijkstra requiere costos no negativos.");
 
-        // Fila = nodo de origen; columna = nodo destino; valor = costo/distancia del tramo.
+        // Fila = nodo de origen; columna = destino; valor = peso del tramo. No crea la vuelta.
         adjacency[originIndex, destinationIndex] = cost;
     }
 
@@ -140,6 +149,7 @@ public sealed class GrafoMA : IGrafoTDA
 
     public IConjuntoTDA Vertices()
     {
+        // Devuelve una copia como conjunto, para no exponer el arreglo interno de etiquetas.
         IConjuntoTDA vertices = new ConjuntoLD();
         vertices.InicializarConjunto();
         for (int index = 0; index < vertexCount; index++)
@@ -164,6 +174,7 @@ public sealed class GrafoMA : IGrafoTDA
 // Implementacion de Dijkstra: devuelve los nodos de menor costo entre origen y destino.
 public static class AlgDijkstra
 {
+    // Busca el camino de menor costo; devuelve false si falta un vertice o no hay ruta.
     public static bool TryGetShortestPath(GrafoMA graph, int origin, int destination, out List<int> path, out int totalCost)
     {
         path = new List<int>();
@@ -189,6 +200,7 @@ public static class AlgDijkstra
             previous[index] = -1;
         }
 
+        // El origen cuesta cero porque todavia no se recorrio ninguna arista.
         distance[originIndex] = 0;
         for (int step = 0; step < count; step++)
         {
@@ -207,6 +219,7 @@ public static class AlgDijkstra
             if (current == destinationIndex)
                 break;
 
+            // Relaja los vecinos directos: solo reemplaza el costo si el nuevo camino es menor.
             for (int neighbor = 0; neighbor < count; neighbor++)
             {
                 int edgeCost = graph.PesoArista(graph.VertexAt(current), graph.VertexAt(neighbor));
@@ -226,7 +239,7 @@ public static class AlgDijkstra
         if (distance[destinationIndex] == GrafoMA.Infinity)
             return false;
 
-        // Se vuelve desde destino hacia origen usando previous[] y luego se invierte la lista.
+        // previous guarda el predecesor de cada nodo; seguirlo hacia atras permite reconstruir la ruta.
         for (int current = destinationIndex; current >= 0; current = previous[current])
             path.Add(graph.VertexAt(current));
         path.Reverse();

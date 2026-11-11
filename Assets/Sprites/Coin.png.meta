@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 7901cd7b8e16a624e85e3757a00d5e35
+guid: c570a08e3a544004780e9f6d5e47018d
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 4393558011857041481
-    second: Missile_Launcher_0
+      213: -3338749442709606003
+    second: Coin_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Missile_Launcher_0
+      name: Coin_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 136
-        height: 225
+        width: 100
+        height: 100
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 9487fc4dbbd09fc30800000000000000
-      internalID: 4393558011857041481
+      spriteID: d81b24142116aa1d0800000000000000
+      internalID: -3338749442709606003
       vertices: []
       indices: 
       edges: []
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Missile_Launcher_0: 4393558011857041481
+      Coin_0: -3338749442709606003
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

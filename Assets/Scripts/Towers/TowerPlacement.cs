@@ -19,28 +19,55 @@ public sealed class TowerPlacement : MonoBehaviour
     [SerializeField, Min(0.1f)] private float gridSize = 0.5f;
     [SerializeField, Min(0.1f)] private float minimumTowerSpacing = 1f;
 
+    [Header("Tower editing")]
+    [SerializeField, Min(0.1f)] private float towerSelectionRadius = 0.55f;
+    [SerializeField] private Color selectedTowerColor = new Color(1f, 0.85f, 0.3f, 1f);
+
     [Header("Placement area")]
     [SerializeField] private Sprite placementAreaSprite;
     [SerializeField] private Color placementAreaColor = new Color(0.2f, 1f, 0.35f, 0.16f);
     [SerializeField] private int placementAreaSortingOrder = -2;
 
     private int unlockedTowerCount = int.MaxValue;
+    private bool[] unlockedTowerTypes;
+    private int globalTowerLimit = int.MaxValue;
     private int[] towerLimits;
     private GameObject placementAreaVisual;
+    private TowerController selectedPlacedTower;
+    private SpriteRenderer selectedTowerRenderer;
+    private Color originalTowerColor;
 
     public int SelectedTowerIndex { get; private set; }
     public int PlacedTowerCount => towerStackController == null
         ? 0
         : towerStackController.PlacedTowerCount;
     public bool CanUndo => towerStackController != null && towerStackController.CanUndo;
-    public int UnlockedTowerCount => Mathf.Min(
-        unlockedTowerCount,
-        towerPrefabs == null ? 0 : towerPrefabs.Length);
+    public TowerController SelectedPlacedTower => selectedPlacedTower;
+    public int GlobalTowerLimit => globalTowerLimit;
+    public int UnlockedTowerCount
+    {
+        get
+        {
+            if (towerPrefabs == null)
+                return 0;
+            if (unlockedTowerTypes == null)
+                return Mathf.Min(unlockedTowerCount, towerPrefabs.Length);
+
+            int count = 0;
+            for (int i = 0; i < unlockedTowerTypes.Length && i < towerPrefabs.Length; i++)
+            {
+                if (unlockedTowerTypes[i] && towerPrefabs[i] != null)
+                    count++;
+            }
+            return count;
+        }
+    }
     public bool IsPlacementAreaVisible =>
         placementAreaVisual != null && placementAreaVisual.activeSelf;
 
     public event Action<int> TowerCountChanged;
     public event Action<int> TowerSelectionChanged;
+    public event Action<TowerController, int> TowerPlaced;
 
     private void Awake()
     {
@@ -59,6 +86,7 @@ public sealed class TowerPlacement : MonoBehaviour
 
     private void OnDisable()
     {
+        ClearPlacedTowerSelection();
         if (towerStackController != null)
             towerStackController.TowerCountChanged -= HandleTowerCountChanged;
 
@@ -73,14 +101,46 @@ public sealed class TowerPlacement : MonoBehaviour
         if (keyboard != null && keyboard.zKey.wasPressedThisFrame)
             UndoLastPlacement();
 
+        if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
+            ClearPlacedTowerSelection();
+
+        if (keyboard != null && (keyboard.deleteKey.wasPressedThisFrame ||
+            keyboard.backspaceKey.wasPressedThisFrame) && selectedPlacedTower != null)
+            RemovePlacedTower(selectedPlacedTower);
+
         Mouse mouse = Mouse.current;
-        if (mouse == null || !mouse.leftButton.wasPressedThisFrame)
+        if (mouse == null || (!mouse.leftButton.wasPressedThisFrame &&
+            !mouse.rightButton.wasPressedThisFrame))
             return;
 
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             return;
 
-        TryPlaceTowerAtScreenPosition(mouse.position.ReadValue());
+        if (worldCamera == null)
+            return;
+
+        Vector3 worldPosition = worldCamera.ScreenToWorldPoint(mouse.position.ReadValue());
+        worldPosition.z = 0f;
+        TowerController clickedTower = towerStackController.FindPlacedTowerNear(
+            worldPosition, towerSelectionRadius);
+
+        if (mouse.rightButton.wasPressedThisFrame)
+        {
+            if (clickedTower != null)
+                RemovePlacedTower(clickedTower);
+            return;
+        }
+
+        if (clickedTower != null)
+        {
+            SelectPlacedTower(clickedTower);
+            return;
+        }
+
+        if (selectedPlacedTower != null)
+            TryMovePlacedTower(selectedPlacedTower, worldPosition);
+        else
+            TryPlaceTower(worldPosition);
     }
 
     public bool SelectTower(int towerIndex)
@@ -95,10 +155,17 @@ public sealed class TowerPlacement : MonoBehaviour
 
     public void SetUnlockedTowerCount(int count)
     {
+        unlockedTowerTypes = null;
         unlockedTowerCount = Mathf.Clamp(
             count,
             0,
             towerPrefabs == null ? 0 : towerPrefabs.Length);
+        SelectFirstAvailableTower();
+    }
+
+    public void SetUnlockedTowerTypes(bool[] unlocked)
+    {
+        unlockedTowerTypes = unlocked == null ? null : (bool[])unlocked.Clone();
         SelectFirstAvailableTower();
     }
 
@@ -111,11 +178,49 @@ public sealed class TowerPlacement : MonoBehaviour
         TowerCountChanged?.Invoke(PlacedTowerCount);
     }
 
+    public void SetGlobalTowerLimit(int limit)
+    {
+        globalTowerLimit = Mathf.Max(1, limit);
+        SelectFirstAvailableTower();
+        TowerCountChanged?.Invoke(PlacedTowerCount);
+    }
+
+    public void ClearPlacedTowers()
+    {
+        ClearPlacedTowerSelection();
+        if (towerStackController == null)
+            return;
+
+        while (towerStackController.TryPopLastPlacement(out TowerController tower, out _))
+        {
+            if (tower != null)
+            {
+                tower.gameObject.SetActive(false);
+                Destroy(tower.gameObject);
+            }
+        }
+
+        SelectFirstAvailableTower();
+    }
+
     public int GetPlacedTowerCount(int towerIndex)
     {
         EnsureReferences();
         towerStackController.ConfigureTowerTypes(towerPrefabs == null ? 0 : towerPrefabs.Length);
         return towerStackController.GetPlacedTowerCount(towerIndex);
+    }
+
+    public bool HasTowerPrefab(int towerIndex)
+    {
+        return towerPrefabs != null && towerIndex >= 0 &&
+            towerIndex < towerPrefabs.Length && towerPrefabs[towerIndex] != null;
+    }
+
+    public Sprite GetTowerPreviewSprite(int towerIndex, int level)
+    {
+        return HasTowerPrefab(towerIndex)
+            ? towerPrefabs[towerIndex].GetLevelSprite(level)
+            : null;
     }
 
     public int GetTowerLimit(int towerIndex)
@@ -136,13 +241,14 @@ public sealed class TowerPlacement : MonoBehaviour
 
     public bool CanPlaceTowerType(int towerIndex)
     {
-        if (towerPrefabs == null || towerIndex < 0 || towerIndex >= UnlockedTowerCount ||
+        if (towerPrefabs == null || towerIndex < 0 || !IsTypeUnlocked(towerIndex) ||
             towerIndex >= towerPrefabs.Length || towerPrefabs[towerIndex] == null)
         {
             return false;
         }
 
-        return GetPlacedTowerCount(towerIndex) < GetTowerLimit(towerIndex);
+        return PlacedTowerCount < globalTowerLimit &&
+            GetPlacedTowerCount(towerIndex) < GetTowerLimit(towerIndex);
     }
 
     public bool HasReachedTowerLimits()
@@ -172,6 +278,7 @@ public sealed class TowerPlacement : MonoBehaviour
     public bool TryPlaceTower(Vector3 worldPosition)
     {
         EnsureReferences();
+        towerStackController.ConfigureTowerTypes(towerPrefabs == null ? 0 : towerPrefabs.Length);
         if (!CanPlaceTowerType(SelectedTowerIndex))
             return false;
 
@@ -186,6 +293,7 @@ public sealed class TowerPlacement : MonoBehaviour
             towerParent);
         if (towerStackController.RegisterPlacement(tower, SelectedTowerIndex))
         {
+            TowerPlaced?.Invoke(tower, SelectedTowerIndex);
             if (!CanPlaceTowerType(SelectedTowerIndex))
                 SelectFirstAvailableTower();
             return true;
@@ -203,8 +311,14 @@ public sealed class TowerPlacement : MonoBehaviour
             return false;
         }
 
+        if (tower == selectedPlacedTower)
+            ClearPlacedTowerSelection();
+
         if (tower != null)
+        {
+            tower.gameObject.SetActive(false);
             Destroy(tower.gameObject);
+        }
 
         SelectFirstAvailableTower();
         return true;
@@ -221,6 +335,11 @@ public sealed class TowerPlacement : MonoBehaviour
 
     public bool IsValidPlacement(Vector3 position)
     {
+        return IsValidPlacement(position, null);
+    }
+
+    public bool IsValidPlacement(Vector3 position, TowerController ignoredTower)
+    {
         Vector2 point = position;
         if (!placementBounds.Contains(point) || blockedPath.Contains(point))
             return false;
@@ -229,7 +348,7 @@ public sealed class TowerPlacement : MonoBehaviour
         foreach (TowerController tower in
                  FindObjectsByType<TowerController>(FindObjectsSortMode.None))
         {
-            if (tower == null)
+            if (tower == null || tower == ignoredTower)
                 continue;
 
             Vector2 difference = tower.transform.position - position;
@@ -238,6 +357,60 @@ public sealed class TowerPlacement : MonoBehaviour
         }
 
         return true;
+    }
+
+    public bool SelectPlacedTower(TowerController tower)
+    {
+        if (tower == null || towerStackController == null ||
+            towerStackController.FindPlacedTowerNear(tower.transform.position, 0.01f) != tower)
+            return false;
+
+        ClearPlacedTowerSelection();
+        selectedPlacedTower = tower;
+        selectedTowerRenderer = tower.GetComponent<SpriteRenderer>();
+        if (selectedTowerRenderer != null)
+        {
+            originalTowerColor = selectedTowerRenderer.color;
+            selectedTowerRenderer.color = selectedTowerColor;
+        }
+        return true;
+    }
+
+    public bool TryMovePlacedTower(TowerController tower, Vector3 worldPosition)
+    {
+        if (tower == null || towerStackController == null ||
+            towerStackController.FindPlacedTowerNear(tower.transform.position, 0.01f) != tower)
+            return false;
+
+        Vector3 destination = SnapToGrid(worldPosition);
+        if (!IsValidPlacement(destination, tower))
+            return false;
+
+        tower.transform.position = destination;
+        if (tower == selectedPlacedTower)
+            ClearPlacedTowerSelection();
+        return true;
+    }
+
+    public bool RemovePlacedTower(TowerController tower)
+    {
+        if (towerStackController == null || !towerStackController.TryRemovePlacement(tower))
+            return false;
+
+        if (tower == selectedPlacedTower)
+            ClearPlacedTowerSelection();
+        tower.gameObject.SetActive(false);
+        Destroy(tower.gameObject);
+        SelectFirstAvailableTower();
+        return true;
+    }
+
+    public void ClearPlacedTowerSelection()
+    {
+        if (selectedTowerRenderer != null)
+            selectedTowerRenderer.color = originalTowerColor;
+        selectedPlacedTower = null;
+        selectedTowerRenderer = null;
     }
 
     private void EnsureReferences()
@@ -262,6 +435,8 @@ public sealed class TowerPlacement : MonoBehaviour
             SelectTower(0);
         else if (keyboard.digit2Key.wasPressedThisFrame || keyboard.numpad2Key.wasPressedThisFrame)
             SelectTower(1);
+        else if (keyboard.digit3Key.wasPressedThisFrame || keyboard.numpad3Key.wasPressedThisFrame)
+            SelectTower(2);
     }
 
     private void HandleTowerCountChanged(int towerCount)
@@ -271,7 +446,7 @@ public sealed class TowerPlacement : MonoBehaviour
 
     private void SelectFirstAvailableTower()
     {
-        for (int index = 0; index < UnlockedTowerCount; index++)
+        for (int index = 0; towerPrefabs != null && index < towerPrefabs.Length; index++)
         {
             if (CanPlaceTowerType(index))
             {
@@ -279,6 +454,13 @@ public sealed class TowerPlacement : MonoBehaviour
                 return;
             }
         }
+    }
+
+    private bool IsTypeUnlocked(int towerIndex)
+    {
+        return unlockedTowerTypes == null
+            ? towerIndex < UnlockedTowerCount
+            : towerIndex < unlockedTowerTypes.Length && unlockedTowerTypes[towerIndex];
     }
 
     private void CreatePlacementAreaVisual()

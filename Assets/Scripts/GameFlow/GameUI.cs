@@ -18,12 +18,17 @@ public class GameUI : MonoBehaviour
     [SerializeField] private Button towerTwoButton;
     [SerializeField] private TMP_Text towerOneCountText;
     [SerializeField] private TMP_Text towerTwoCountText;
+    [SerializeField] private Button towerThreeButton;
+    [SerializeField] private TMP_Text towerThreeCountText;
 
     [Header("Results")]
     [SerializeField] private GameObject victoryPanel;
     [SerializeField] private GameObject defeatPanel;
-    [SerializeField] private Button[] playAgainButtons;
-    [SerializeField] private Button[] mainMenuButtons;
+    [SerializeField] private Button nextLevelButton;
+    [SerializeField] private Button retryButton;
+    [SerializeField] private Button victoryUpgradesButton;
+    [SerializeField] private Button defeatUpgradesButton;
+    private ShopPanelUI shopPanel;
 
     private void OnEnable()
     {
@@ -39,9 +44,17 @@ public class GameUI : MonoBehaviour
             towerOneButton.onClick.AddListener(SelectTowerOne);
         if (towerTwoButton != null)
             towerTwoButton.onClick.AddListener(SelectTowerTwo);
+        if (towerThreeButton != null)
+            towerThreeButton.onClick.AddListener(SelectTowerThree);
 
-        AddButtonListeners(playAgainButtons, RestartLevel);
-        AddButtonListeners(mainMenuButtons, ReturnToMainMenu);
+        if (nextLevelButton != null)
+            nextLevelButton.onClick.AddListener(ContinueResult);
+        if (retryButton != null)
+            retryButton.onClick.AddListener(ContinueResult);
+        if (victoryUpgradesButton != null)
+            victoryUpgradesButton.onClick.AddListener(gameManager.OpenShopFromResult);
+        if (defeatUpgradesButton != null)
+            defeatUpgradesButton.onClick.AddListener(gameManager.OpenShopFromResult);
     }
 
     private void Start()
@@ -50,6 +63,18 @@ public class GameUI : MonoBehaviour
         {
             enabled = false;
             return;
+        }
+
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null)
+            canvas = FindFirstObjectByType<Canvas>();
+        if (canvas != null)
+        {
+            shopPanel = canvas.GetComponent<ShopPanelUI>();
+            if (shopPanel == null)
+                Debug.LogError("El Canvas necesita ShopPanelUI y ShopOverlay configurados en la escena.", canvas);
+            else
+                shopPanel.Initialize(gameManager);
         }
 
         Refresh();
@@ -69,9 +94,17 @@ public class GameUI : MonoBehaviour
             towerOneButton.onClick.RemoveListener(SelectTowerOne);
         if (towerTwoButton != null)
             towerTwoButton.onClick.RemoveListener(SelectTowerTwo);
+        if (towerThreeButton != null)
+            towerThreeButton.onClick.RemoveListener(SelectTowerThree);
 
-        RemoveButtonListeners(playAgainButtons, RestartLevel);
-        RemoveButtonListeners(mainMenuButtons, ReturnToMainMenu);
+        if (nextLevelButton != null)
+            nextLevelButton.onClick.RemoveListener(ContinueResult);
+        if (retryButton != null)
+            retryButton.onClick.RemoveListener(ContinueResult);
+        if (victoryUpgradesButton != null)
+            victoryUpgradesButton.onClick.RemoveListener(gameManager.OpenShopFromResult);
+        if (defeatUpgradesButton != null)
+            defeatUpgradesButton.onClick.RemoveListener(gameManager.OpenShopFromResult);
     }
 
     private void BeginWave()
@@ -89,6 +122,11 @@ public class GameUI : MonoBehaviour
         gameManager.SelectTower(1);
     }
 
+    private void SelectTowerThree()
+    {
+        gameManager.SelectTower(2);
+    }
+
     private void Refresh()
     {
         GameFlowState state = gameManager.State;
@@ -96,34 +134,54 @@ public class GameUI : MonoBehaviour
 
         SetActive(victoryPanel, state == GameFlowState.Victory);
         SetActive(defeatPanel, state == GameFlowState.Defeat);
-        SetActive(placementHint, isPreparing && !gameManager.HasStarted);
-        SetActive(waveText, gameManager.HasStarted);
+        if (nextLevelButton != null)
+        {
+            TMP_Text label = nextLevelButton.GetComponentInChildren<TMP_Text>(true);
+            if (label != null)
+                label.text = gameManager.HasNextWave ? "NextLevel" : "Main Menu";
+        }
+        SetActive(placementHint, isPreparing);
+        SetActive(waveText, true);
         SetActive(enemiesText, gameManager.HasStarted);
-        SetActive(startButton, gameManager.CanBeginWave);
-        SetActive(towerOneButton, isPreparing && gameManager.RequiredCannonTowers > 0);
-        SetActive(towerTwoButton, isPreparing && gameManager.RequiredMachineGunTowers > 0);
+        SetActive(startButton, isPreparing);
+        SetActive(towerOneButton, isPreparing);
+        SetActive(towerTwoButton, isPreparing && gameManager.IsMachineGunUnlocked);
+        SetActive(towerThreeButton, isPreparing && gameManager.IsMissileUnlocked);
 
-        waveText.text = $"Oleada {gameManager.CurrentWave}";
-        enemiesText.text = $"Enemigos: {gameManager.RemainingEnemies}";
-        livesText.text = $"Vida: {gameManager.RemainingLives}";
+        waveText.text = $"Level {gameManager.CurrentWave}";
+        enemiesText.text = $"Enemies: {gameManager.RemainingEnemies}";
+        livesText.text = $"Lives: {gameManager.RemainingLives}";
 
-        int remainingCannon = Mathf.Max(0, gameManager.RequiredCannonTowers - gameManager.GetPlacedTowerCount(0));
-        int remainingMachineGun = Mathf.Max(0, gameManager.RequiredMachineGunTowers - gameManager.GetPlacedTowerCount(1));
-        towerOneCountText.text = $"{remainingCannon} / {gameManager.RequiredCannonTowers}";
-        towerTwoCountText.text = $"{remainingMachineGun} / {gameManager.RequiredMachineGunTowers}";
+        int cannonSlots = gameManager.GetTowerSlots(TowerKind.Cannon);
+        int mgSlots = gameManager.GetTowerSlots(TowerKind.MG);
+        int missileSlots = gameManager.GetTowerSlots(TowerKind.Missile);
+        int cannonRemaining = Mathf.Max(0, cannonSlots - gameManager.GetPlacedTowerCount(0));
+        int mgRemaining = Mathf.Max(0, mgSlots - gameManager.GetPlacedTowerCount(1));
+        int missileRemaining = Mathf.Max(0, missileSlots - gameManager.GetPlacedTowerCount(2));
+
+        towerOneCountText.text = $"{cannonRemaining} / {cannonSlots}";
+        towerTwoCountText.text = $"{mgRemaining} / {mgSlots}";
+        towerThreeCountText.text = $"{missileRemaining} / {missileSlots}";
+
+        SetTowerSprite(towerOneButton, gameManager.GetTowerPreviewSprite(0));
+        SetTowerSprite(towerTwoButton, gameManager.GetTowerPreviewSprite(1));
+        SetTowerSprite(towerThreeButton, gameManager.GetTowerPreviewSprite(2));
 
         startButton.interactable = gameManager.CanBeginWave;
         towerOneButton.interactable = gameManager.CanPlaceTowerType(0);
         towerTwoButton.interactable = gameManager.CanPlaceTowerType(1);
+        if (towerThreeButton != null)
+            towerThreeButton.interactable = gameManager.CanPlaceTowerType(2);
+        if (shopPanel != null)
+            shopPanel.Refresh();
     }
 
-    private void RestartLevel()
+    private void ContinueResult()
     {
-        Scene currentScene = SceneManager.GetActiveScene();
-        if (currentScene.buildIndex >= 0)
-            SceneManager.LoadScene(currentScene.buildIndex);
+        if (gameManager.State == GameFlowState.Victory && !gameManager.HasNextWave)
+            ReturnToMainMenu();
         else
-            SceneManager.LoadScene(currentScene.name);
+            gameManager.ContinueFromResult();
     }
 
     private void ReturnToMainMenu()
@@ -136,41 +194,14 @@ public class GameUI : MonoBehaviour
         if (gameManager != null && placementHint != null && waveText != null &&
             enemiesText != null && livesText != null && startButton != null &&
             towerOneButton != null && towerTwoButton != null &&
-            towerOneCountText != null && towerTwoCountText != null)
+            towerOneCountText != null && towerTwoCountText != null &&
+            towerThreeButton != null && towerThreeCountText != null)
         {
             return true;
         }
 
         Debug.LogError("GameUI necesita referencias al GameManager y al HUD.", this);
         return false;
-    }
-
-    private static void AddButtonListeners(
-        UnityEngine.UI.Button[] buttons,
-        UnityEngine.Events.UnityAction action)
-    {
-        if (buttons == null)
-            return;
-
-        foreach (UnityEngine.UI.Button button in buttons)
-        {
-            if (button != null)
-                button.onClick.AddListener(action);
-        }
-    }
-
-    private static void RemoveButtonListeners(
-        UnityEngine.UI.Button[] buttons,
-        UnityEngine.Events.UnityAction action)
-    {
-        if (buttons == null)
-            return;
-
-        foreach (UnityEngine.UI.Button button in buttons)
-        {
-            if (button != null)
-                button.onClick.RemoveListener(action);
-        }
     }
 
     private static void SetActive(Component component, bool active)
@@ -183,5 +214,11 @@ public class GameUI : MonoBehaviour
     {
         if (target != null)
             target.SetActive(active);
+    }
+
+    private static void SetTowerSprite(Button button, Sprite sprite)
+    {
+        if (button != null && sprite != null && button.TryGetComponent(out UnityEngine.UI.Image image))
+            image.sprite = sprite;
     }
 }
