@@ -87,6 +87,7 @@ public interface IGrafoTDA
 
 public sealed class GrafoMA : IGrafoTDA
 {
+    // Se usa un valor grande como "infinito": significa que dos nodos no tienen conexion directa.
     public const int Infinity = int.MaxValue / 4;
 
     private readonly int[,] adjacency = new int[32, 32];
@@ -124,6 +125,7 @@ public sealed class GrafoMA : IGrafoTDA
         if (cost < 0)
             throw new ArgumentOutOfRangeException(nameof(cost), "Dijkstra requiere costos no negativos.");
 
+        // Fila = nodo de origen; columna = nodo destino; valor = costo/distancia del tramo.
         adjacency[originIndex, destinationIndex] = cost;
     }
 
@@ -170,6 +172,9 @@ public static class AlgDijkstra
             return false;
 
         int count = graph.VertexCount;
+        // distance: menor costo conocido desde el origen hasta cada nodo.
+        // previous: nodo anterior para reconstruir la ruta final.
+        // visited: evita volver a evaluar un nodo cuyo mejor costo ya esta decidido.
         int[] distance = new int[count];
         int[] previous = new int[count];
         bool[] visited = new bool[count];
@@ -187,6 +192,7 @@ public static class AlgDijkstra
         distance[originIndex] = 0;
         for (int step = 0; step < count; step++)
         {
+            // Se elige el nodo pendiente con menor distancia acumulada.
             int current = -1;
             for (int index = 0; index < count; index++)
             {
@@ -207,6 +213,7 @@ public static class AlgDijkstra
                 if (visited[neighbor] || edgeCost == GrafoMA.Infinity)
                     continue;
 
+                // Relajacion: se prueba si pasar por "current" mejora el costo del vecino.
                 int candidateDistance = distance[current] + edgeCost;
                 if (candidateDistance < distance[neighbor])
                 {
@@ -219,6 +226,7 @@ public static class AlgDijkstra
         if (distance[destinationIndex] == GrafoMA.Infinity)
             return false;
 
+        // Se vuelve desde destino hacia origen usando previous[] y luego se invierte la lista.
         for (int current = destinationIndex; current >= 0; current = previous[current])
             path.Add(graph.VertexAt(current));
         path.Reverse();
